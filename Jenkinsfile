@@ -14,7 +14,7 @@ pipeline {
     stages {
         stage('Checkout GitHub') {
             steps {
-                git branch: 'main',
+                git branch: 'master',
                     url: 'https://github.com/Sathya252/apachewebsite.git'
             }
         }
