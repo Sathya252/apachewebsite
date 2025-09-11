@@ -2,16 +2,14 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // your DockerHub creds ID
-        APP_NAME = "apachewebsite"
-        IMAGE_NAME = "rohith252/apachewebsite"             // replace with your DockerHub repo
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // your DockerHub creds
+        DOCKER_IMAGE = "rohith252/apachewebsite"           // change if needed
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                git branch: 'master',
-                    url: 'https://github.com/Sathya252/apachewebsite.git'
+                git branch: 'master', url: 'https://github.com/Sathya252/apachewebsite.git'
             }
         }
 
@@ -19,37 +17,27 @@ pipeline {
             steps {
                 sshagent (credentials: ['devops-key']) {
                     sh '''
-                        ansible-playbook -i ~/.ssh/apachewebsite/apachewebsite/inventory.ini \
-                                         ~/.ssh/apachewebsite/apachewebsite/install_apache.yml
+                        ansible-playbook -i inventory.ini install_apache.yml
                     '''
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build & Push Docker Image') {
             steps {
                 sh '''
-                    docker build -t $IMAGE_NAME:$BUILD_NUMBER .
+                    docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                    docker push $DOCKER_IMAGE:$BUILD_NUMBER
                 '''
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push $IMAGE_NAME:$BUILD_NUMBER
-                        docker tag $IMAGE_NAME:$BUILD_NUMBER $IMAGE_NAME:latest
-                        docker push $IMAGE_NAME:latest
-                    '''
-                }
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
+                    # replace image in deployment.yml with new tag
+                    sed -i "s|image:.*|image: $DOCKER_IMAGE:$BUILD_NUMBER|" deployment.yml
                     kubectl apply -f deployment.yml
                     kubectl apply -f service.yml
                 '''
