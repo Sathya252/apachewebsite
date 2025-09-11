@@ -19,7 +19,8 @@ pipeline {
                     playbook: 'install_apache.yml',
                     inventory: 'inventory.ini',
                     credentialsId: 'devops-node-key',
-                    sudoUser: 'devops'
+                    sudoUser: 'devops',
+                    installation: 'ansible' // Must match your configured Ansible installation in Jenkins
                 )
             }
         }
