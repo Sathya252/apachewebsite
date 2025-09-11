@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // your DockerHub creds
-        DOCKER_IMAGE = "rohith252/apachewebsite"           // change if needed
+        ANSIBLE_HOST_KEY_CHECKING = 'False'  // disables strict host key checking
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Checkout SCM') {
             steps {
                 git branch: 'master', url: 'https://github.com/Sathya252/apachewebsite.git'
             }
@@ -15,8 +15,14 @@ pipeline {
 
         stage('Install Apache with Ansible') {
             steps {
-                sshagent (credentials: ['devops-key']) {
+                sshagent(['devops-key']) {
                     sh '''
+                        # ensure known_hosts has the node key
+                        mkdir -p ~/.ssh
+                        ssh-keyscan -H 172.31.89.150 >> ~/.ssh/known_hosts
+                        chmod 644 ~/.ssh/known_hosts
+
+                        # run ansible playbook
                         ansible-playbook -i inventory.ini install_apache.yml
                     '''
                 }
@@ -25,23 +31,25 @@ pipeline {
 
         stage('Build & Push Docker Image') {
             steps {
-                sh '''
-                    docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
-                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-                    docker push $DOCKER_IMAGE:$BUILD_NUMBER
-                '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh '''
+                        docker build -t $DOCKER_USER/apache-website:latest .
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push $DOCKER_USER/apache-website:latest
+                    '''
+                }
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    # replace image in deployment.yml with new tag
-                    sed -i "s|image:.*|image: $DOCKER_IMAGE:$BUILD_NUMBER|" deployment.yml
                     kubectl apply -f deployment.yml
                     kubectl apply -f service.yml
+                    kubectl rollout status deployment/apache-deployment
                 '''
             }
         }
+
     }
 }
