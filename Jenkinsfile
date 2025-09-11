@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // your DockerHub creds
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // Jenkins DockerHub creds ID
         DOCKER_IMAGE = "rohith252/apachewebsite"           // change if needed
     }
 
@@ -13,20 +13,17 @@ pipeline {
             }
         }
 
-        stage('Install Apache with Ansible') {
-            steps {
-                sshagent (credentials: ['devops-key']) {
-                    sh '''
-                        ansible-playbook -i inventory.ini install_apache.yml
-                    '''
-                }
-            }
-        }
-
-        stage('Build & Push Docker Image') {
+        stage('Build Docker Image') {
             steps {
                 sh '''
                     docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                '''
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                sh '''
                     echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
                     docker push $DOCKER_IMAGE:$BUILD_NUMBER
                 '''
@@ -36,7 +33,6 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    # replace image in deployment.yml with new tag
                     sed -i "s|image:.*|image: $DOCKER_IMAGE:$BUILD_NUMBER|" deployment.yml
                     kubectl apply -f deployment.yml
                     kubectl apply -f service.yml
