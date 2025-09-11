@@ -1,5 +1,5 @@
 ---
-- hosts: webservers
+- hosts: ansiblegroup
   become: yes
   tasks:
     - name: Install Apache
