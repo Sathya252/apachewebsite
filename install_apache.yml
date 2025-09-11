@@ -1,0 +1,23 @@
+---
+- hosts: webservers
+  become: yes
+  tasks:
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+        update_cache: yes
+
+    - name: Start Apache
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Copy entire website
+      copy:
+        src: /home/devops/.ssh/apachewebsite/apachewebsite/
+        dest: /var/www/html/
+        owner: www-data
+        group: www-data
+        mode: '0644'
