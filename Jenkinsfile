@@ -1,26 +1,26 @@
 pipeline {
     agent any
+
     environment {
         REPO_PATH = '/var/lib/jenkins/.ssh/apachewebsite/apachewebsite'
-        INVENTORY = '/var/lib/jenkins/.ssh/apachewebsite/inventory.ini'
         DOCKER_IMAGE = 'rohith252/apachewebsite:latest'
-        DOCKERHUB_CREDENTIALS = 'docker-hub'
-        ANSIBLE_CREDENTIALS = 'devops-node-key'
+        DOCKERHUB_CREDENTIALS = 'docker-hub' // Jenkins credential ID
     }
+
     stages {
-        stage('Checkout GitHub Repo') {
+        stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/Sathya252/apachewebsite.git'
+                git branch: 'main',
+                    url: 'https://github.com/rohith252/apachewebsite.git'
             }
         }
 
         stage('Install Apache via Ansible') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: "${ANSIBLE_CREDENTIALS}", keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
-                    sh """
-                        ansible-playbook -i ${INVENTORY} ${REPO_PATH}/install_apache.yml
-                    """
-                }
+                ansiblePlaybook(
+                    playbook: "${REPO_PATH}/install_apache.yml",
+                    inventory: "${REPO_PATH}/inventory.ini"
+                )
             }
         }
 
@@ -44,33 +44,6 @@ pipeline {
                     """
                 }
             }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh """
-                    kubectl apply -f ${REPO_PATH}/deployment.yml
-                    kubectl apply -f ${REPO_PATH}/service.yml
-                """
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                sh """
-                    kubectl get pods
-                    kubectl get svc
-                """
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Pipeline completed successfully!'
-        }
-        failure {
-            echo 'Pipeline failed. Check the console output for errors.'
         }
     }
 }
