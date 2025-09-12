@@ -13,7 +13,7 @@ pipeline {
 
         stage('Checkout GitHub Repo') {
             steps {
-                git branch: 'main', url: 'https://github.com/Sathya252/apachewebsite.git'
+                git branch: 'master', url: 'https://github.com/Sathya252/apachewebsite.git'
             }
         }
 
